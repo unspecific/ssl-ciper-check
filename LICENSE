@@ -1,0 +1,52 @@
+# SSL Cipher Check
+#   Writen by Lee 'MadHat' Heath (madhat@unspecific.com)
+# http://www.unspecific.com/ssl/
+#
+# Patches/fixes provided by:
+#   markus.theissinger in .de
+#
+# This script uses the openssl executable to connect to a server and test
+# each of the SSL cipher methods supported by the local openssl client.
+# By default it checks 443, for HTTPs, but will work on any SSL enabled
+# port.  The default output is just a listing of each cipher and TLS1,
+# SSLv2 and SSLv3 and SUCCESS or FAIL message.  It automatically creates
+# a log called ssl_dump.log (over written with each run) that has the 
+# specific output of each openssl call.
+#
+# Copyright (c) 2009-2014, Lee MadHat Heath (madhat@unspecific.com)
+# All rights reserved.
+#
+# Redistribution and use in source and binary forms, with or without
+# modification, are permitted provided that the following conditions
+# are met:
+#
+#   * Redistributions of source code must retain the above copyright
+#     notice, this list of conditions and the following disclaimer.
+#   * Redistributions in binary form must reproduce the above copyright
+#     notice, this list of conditions and the following disclaimer in
+#     the documentation and/or other materials provided with the distribution.
+#   * Neither the name of MadHat Productions nor the names of its
+#     contributors may be used to endorse or promote products derived
+#     from this software without specific prior written permission.
+#
+# THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+# "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+# LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
+# FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+# OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+# SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
+# TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+# PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
+# LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
+# NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+# SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+#
+#  Note:  BEAST  and CRIME are coming.
+#   BEAST takes advantage of a flaw in block ciphers
+#        The vuln is in TLS1.0 only and only there when using block 
+#         ciphers with CBC.  Basically if the server used TLS1.0 and 
+#         supports any cipher other than RC4 it is potentially vulnerable.
+#   CRIME takes advantage in how SSL compression is handled in TLS1.0
+#
+# As of October 2014 SSLv3 is considered weak due to POODLE
+#
