@@ -5,13 +5,25 @@
 #
 # Run as ./mkcabundle.pl > ca-bundle.crt
 #
+#  new Locaiton: https://hg.mozilla.org/mozilla-central/raw-file/tip/security/nss/lib/ckfw/builtins/certdata.txt
 
-my $cvsroot = ':pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot';
-my $certdata = 'mozilla/security/nss/lib/ckfw/builtins/certdata.txt';
+# my $cvsroot = ':pserver:anonymous@cvs-mirror.mozilla.org:/cvsroot';
+# my $certdata = 'mozilla/security/nss/lib/ckfw/builtins/certdata.txt';
+# open(IN, "cvs -d $cvsroot co -p $certdata|")
+#     || die "could not check out certdata.txt";
+my $get_data = '';
+my $certdata = "https://hg.mozilla.org/mozilla-central/raw-file/tip/security/nss/lib/ckfw/builtins/certdata.txt";
 
+if (-e "/usr/bin/curl") {
+  $get_data = "/usr/bin/curl -s";
+} elsif (-e "/usr/bin/wget") {
+  $get_data = "/usr/bin/wget -q -O -";
+} elsif (-e "/usr/bin/lynx") {
+  $get_data = "/usr/bin/lynx -source";
+}
 
-open(IN, "cvs -d $cvsroot co -p $certdata|")
-    || die "could not check out certdata.txt";
+open(IN, "$get_data $certdata|")
+    || die "could not retrieve certdata.txt";
 
 my $incert = 0;
 
