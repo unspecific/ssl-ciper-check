@@ -1,6 +1,6 @@
 #!/usr/bin/perl
-#---------------------------------------
 #
+#---------------------------------------
 # SSL Cipher Check
 #   Writen by Lee 'MadHat' Heath (madhat@unspecific.com)
 # http://www.unspecific.com/ssl/
@@ -13,7 +13,7 @@
 # By default it checks 443, for HTTPs, but will work on any SSL enabled
 # port.  The default output is just a listing of each cipher and TLS1,
 # SSLv2 and SSLv3 and SUCCESS or FAIL message.  It automatically creates
-# a log called ssl_dump.log (over written with each run) that has the 
+# a log called ssl_dump.log (over written with each run) that has the
 # specific output of each openssl call.
 #
 # Copyright (c) 2009-2014, Lee MadHat Heath (madhat@unspecific.com)
@@ -46,8 +46,8 @@
 #
 #  Note:  BEAST  and CRIME are coming.
 #   BEAST takes advantage of a flaw in block ciphers
-#        The vuln is in TLS1.0 only and only there when using block 
-#         ciphers with CBC.  Basically if the server used TLS1.0 and 
+#        The vuln is in TLS1.0 only and only there when using block
+#         ciphers with CBC.  Basically if the server used TLS1.0 and
 #         supports any cipher other than RC4 it is potentially vulnerable.
 #   CRIME takes advantage in how SSL compression is handled in TLS1.0
 #
@@ -60,7 +60,7 @@ use warnings;
 use strict;
 use Data::Dumper;
 use Getopt::Std;
-    
+
 my $openssl = '/usr/bin/openssl';
 my $gnutls = '/usr/bin/gnutls-cli-debug';
 my $cafile = 'ca-bundle.crt';
@@ -69,17 +69,15 @@ my $DEBUG = 0;
 my %ciphers;
 my @ciphers;
 my $cipher;
-my @weak;
-my %names;
 
-@weak = ('ADH-AES128-SHA', 'ADH-AES256-SHA','ADH-DES-CBC-SHA', 
-    'ADH-DES-CBC3-SHA', 'ADH-RC4-MD5', 'EXP-ADH-DES-CBC-SHA', 
-    'EXP-ADH-RC4-MD5', 'EDH-RSA-DES-CBC-SHA', 'EXP-EDH-RSA-DES-CBC-SHA', 
-    'EDH-DSS-DES-CBC-SHA', 'EXP-EDH-DSS-DES-CBC-SHA', 'DES-CBC-SHA', 
-    'EXP-DES-CBC-SHA', 'EXP-RC2-CBC-MD5', 'EXP-RC4-MD5', 'DES-CBC-MD5', 
+my @weak = ('ADH-AES128-SHA', 'ADH-AES256-SHA','ADH-DES-CBC-SHA',
+    'ADH-DES-CBC3-SHA', 'ADH-RC4-MD5', 'EXP-ADH-DES-CBC-SHA',
+    'EXP-ADH-RC4-MD5', 'EDH-RSA-DES-CBC-SHA', 'EXP-EDH-RSA-DES-CBC-SHA',
+    'EDH-DSS-DES-CBC-SHA', 'EXP-EDH-DSS-DES-CBC-SHA', 'DES-CBC-SHA',
+    'EXP-DES-CBC-SHA', 'EXP-RC2-CBC-MD5', 'EXP-RC4-MD5', 'DES-CBC-MD5',
     'EXP-RC2-CBC-MD5', 'EXP-RC4-MD5', 'NULL-SHA', 'NULL-MD5', 'AECDH-NULL-SHA',
     'EXPORT');
-%names = ('OU' => 'Organizational Unit (OU)',
+my %names = ('OU' => 'Organizational Unit (OU)',
           'O'  => 'Company (O)',
           'L'  => 'City (L)',
           'ST' => 'State (ST)',
@@ -89,16 +87,30 @@ my %names;
           '1.3.6.1.4.1.311.60.2.1.2'  => 'State',
           'serialNumber' => 'Serial Number',
           'emailAddress' => 'Contact',
+          'street' => 'Street Address',
+          'postalCode' => 'Postal Code',
+          'businessCategory' => 'Business',
+          'jurisdictionST' => 'State (ST)',
+          'jurisdictionC'  => 'Country (C)',
           '2.5.4.9' => 'Address',
           '2.5.4.17' => 'Zip Code',
           '2.5.4.15' => 'Business Category'
     );
+my %protocols = (
+     'SSLv2' => {'on' => '-ssl2', 'off' => '-no_ssl2', 'support' => 'yes'},
+     'SSLv3' => {'on' => '-ssl3', 'off' => '-no_ssl3', 'support' => 'yes'},
+     'TLSv1' => {'on' => '-tls1', 'off' => '-no_tls1', 'support' => 'yes'},
+     'TLSv1.1' => {'on' => '-tls1_1', 'off' => '-no_tls1_1', 'support' => 'yes'},
+     'TLSv1.2' => {'on' => '-tls1_2', 'off' => '-no_tls1_2', 'support' => 'yes'}
+);
+my $protocol_count = 5;
+
 ###########################################################################
 
-my $VERSION = '1.9';
+my $VERSION = '2.0';
+
 
 my $host;
-
 my %opts;
 
 getopts('dgvwas',\%opts);
@@ -124,9 +136,18 @@ if (!$ARGV[0]) {
   print "-a  Show all ciphers, enabled or not\n";
   print "-s  Show only the STRONG ciphers enabled.\n";
   print "\n";
+  if (!-e $openssl) {
+    print "WARNING: OpenSSL not found at $openssl, unable to run\n";
+  }
+  if (!-e $gnutls) {
+    print "WARNING: gnutls not found at $gnutls, unable to run extra checks\n";
+  }
   exit;
 } else {
   $host = $ARGV[0];
+  if ($host !~ /^[a-zA-Z0-9\-\.]+$/) {
+    die "Please check hostanme ($host)\n\n"
+  }
 }
 if ($opt_d) {
   $DEBUG = 1;
@@ -142,10 +163,10 @@ if (-e $cafile) {
 }
 my $start = time;
 my $port = $ARGV[1]?$ARGV[1]:443;
-open (META, ">ssl_dump.log");
-print META localtime() . " START\n";
+open (META, ">ssl_dump.log") if ($DEBUG);
+print META localtime() . " START\n" if ($DEBUG);
 print localtime() . " START\n" if ($opt_v);
-print META "Testing $host:$port\n";
+print META "Testing $host:$port\n" if ($DEBUG);
 print "Testing $host:$port\n";
 
 if ($opt_v) {
@@ -157,179 +178,210 @@ if ($opt_v) {
   }
   close (SSL);
 }
-
-
-push @ciphers, 'EXPORT';
-
-open (SSL, "$openssl ciphers 'ALL:eNULL' -v|") or die "$!\n";
-while (<SSL>) {
-  chomp;
-  my @cipher = split(' ');
-  $cipher = $cipher[0];
-  if ($cipher[4] eq 'Enc=None') {
-    $ciphers{$cipher[0]} = 'None';
-  } else {
-    $cipher[4] =~ /\((\d+)\)/;
-    $ciphers{$cipher[0]} = "$1 bits";
-  }
-  push @ciphers, $cipher[0];
-}
-close (SSL);
-open (SSL, "$openssl ciphers 'ALL:aNULL' -v|") or die "$!\n";
-while (<SSL>) {
-  chomp;
-  my @cipher = split(' ');
-  $cipher = $cipher[0];
-  if ($cipher[4] eq 'Enc=None') {
-    $ciphers{$cipher[0]} = 'None';
-  } else {
-    $cipher[4] =~ /\((\d+)\)/;
-    $ciphers{$cipher[0]} = "$1 bits";
-  }
-  push @ciphers, $cipher[0];
-}
-close (SSL);
-my %saw;
-my @out = grep(!$saw{$_}++, @ciphers);
-@ciphers = @out;
-my $pci = 0;
-my %results;
-
-my $ts = $#ciphers * 3;
-print "Running a total of $ts scans\n" if ($opt_v);
-
-print META join(", ", @ciphers) . "\n" if ($DEBUG);
-
-if ($opt_v) {
-  print "Getting default Cipher/Proto\n" if ($DEBUG);
-  print META "echo | $openssl s_client $options -connect $host:$port\n" if ($DEBUG);
-  open (SSL, "echo | $openssl s_client $options -connect $host:$port 2>&1 |");
+####
+#
+#  Testing for support of specific protocols as outlined above
+#
+#
+print META "Testing for SSL/TLS Support\n" if ($DEBUG);
+for my $protocol (sort keys %protocols) {
+  print META "Testing $protocol ($protocols{$protocol}{'on'})\n" if ($DEBUG);
+  open (SSL, "$openssl s_client $protocols{$protocol}{'on'} 2>&1 |") or die "ERROR: $!\n" ;
   while (<SSL>) {
-    chomp;
-    print META "`-DEF:$cipher: $_\n";;
-    if (/^    Protocol  : (.+)$/) {
-      $results{'default_proto'} = $1;
-    } elsif (/^    Cipher    :(.+)$/) {
-      $results{'default_cipher'} = $1;
+    if (/unknown option/) {
+      print "openssl s_client does not support $protocol\n" if ($opt_v);
+      print META "openssl s_client does not support $protocol\n" if ($DEBUG);
+      $protocols{$protocol}{'support'} = 'no';
+      $protocol_count--;
     }
   }
   close(SSL);
 }
 
-print META "\n";
+# push @ciphers, 'EXPORT';
+
+####
+#
+#  Testing for support of specific ciphers
+#  As of openssl 1.0 the -v must be before the list of ciphers
+#
+#
+print META "Getting cipher list from $openssl\n" if ($DEBUG);
+# print META "echo | $openssl ciphers -v 'ALL:eNULL'\n" if ($DEBUG);
+open (SSL, "$openssl ciphers -v 'ALL:eNULL'|") or die "$!\n";
+while (<SSL>) {
+  chomp;
+  my @cipher = split(' ');
+  my $cipher_name = $cipher[0];
+  # if ($DEBUG) { print META "Cipher: $cipher_name\n" . Dumper(@cipher) }
+  for my $cipher_data (@cipher) {
+    if ($cipher_data eq 'Enc=None') {
+      $ciphers{$cipher_name} = 'None';
+    } elsif ($cipher_data =~ /^Enc=.+\((\d+)\)$/) {
+      $ciphers{$cipher_name} = "$1 bits";
+    }
+    push @ciphers, $cipher_name;
+  }
+}
+close (SSL);
+# print META "echo | $openssl ciphers -v 'ALL:aNULL'\n" if ($DEBUG);
+open (SSL, "$openssl ciphers -v 'ALL:aNULL'|") or die "$!\n";
+while (<SSL>) {
+  chomp;
+  my @cipher = split(' ');
+  my $cipher_name = $cipher[0];
+  # if ($DEBUG) { print META "Cipher: $cipher_name\n" . Dumper(@cipher) }
+  for my $cipher_data (@cipher) {
+    if ($cipher_data eq 'Enc=None') {
+      $ciphers{$cipher_name} = 'None';
+    } elsif ($cipher_data =~ /^Enc=.+\((\d+)\)$/) {
+      $ciphers{$cipher_name} = "$1 bits";
+    }
+    push @ciphers, $cipher_name;
+  }
+}
+close (SSL);
+
+####
+#
+#  Testing website/IP starts here
+#
+#
+my %saw;
+my $pci = 0;
+my %results;
+
+# remove duplicate ciphers
+@ciphers = grep(!$saw{$_}++, @ciphers);
+
+if ($opt_v) {
+  my $ts = $#ciphers * $protocol_count;
+  print "Running a total of $ts scans";
+  print " across $protocol_count protocols";
+  print " with $#ciphers ciphers\n";
+}
+print META join(", ", @ciphers) . "\n" if ($DEBUG);
+# print META "\n\n" . Dumper(\%ciphers) if ($DEBUG);
+# print META "\n\n" . Dumper(\@ciphers) if ($DEBUG);
+
+####
+#
+#  Testing for default (let the server decide what to use)
+#
+#
+if ($opt_v) {
+  my $grab_cert = "FALSE";
+  print "Getting default Cipher/Proto\n" if ($DEBUG);
+  print META "echo | $openssl s_client $options -connect $host:$port\n" if ($DEBUG);
+  open (SSL, "echo | $openssl s_client $options -connect $host:$port 2>&1 |");
+  while (<SSL>) {
+    chomp;
+    print META "`-DEF: $_\n" if ($DEBUG);
+    if (/^-----BEGIN CERTIFICATE-----$/) {
+      $results{'certificate'} = "$_\n";
+      $grab_cert = "TRUE";
+      next;
+    } elsif (/^-----END CERTIFICATE-----$/) {
+      $results{'certificate'} .= "$_\n";
+      $grab_cert = "FALSE";
+      next;
+    } elsif ($grab_cert eq "TRUE") {
+      $results{'certificate'} .= "$_\n";
+      next;
+    }
+    if (/^\d+:error:/) {
+      print META "`-DEF: ERROR\n" if ($DEBUG);
+      my ($pid, $err, $unk, $routine, $func,
+        $msg, $file, $lineno, $err_msg) = split(':');
+      if ($err_msg eq 'Name or service not known') {
+        die "ERROR: $err_msg\nPlease check hostname ($host)\n\n";
+      } elsif ($msg eq 'Connection refused') {
+        die "ERROR: $msg\nERROR: $host:$port\n\n";
+      }
+    } elsif (/^    Protocol  : (.+)$/) {
+      $results{'default_proto'} = $1;
+    } elsif (/^    Cipher    : (.+)$/) {
+      $results{'default_cipher'} = $1;
+    } elsif (/^Secure Renegotiation/) {
+      $results{'renegoation'} = $_;
+    }
+  }
+  close(SSL);
+  if ($opt_v and $results{'certificate'}) {
+    &parse_cert($results{'certificate'});
+  }
+}
+print META Dumper(\%results) if ($DEBUG);
+
+####
+#
+#  Testing each cipher for each protocol supported by openssl
+#
+#
+print META "\n" if ($DEBUG);
+my $counter;
 for my $cipher (sort @ciphers) {
   next if ($cipher =~ /^\s*$/);
-  print "Checking $cipher\n" if ($DEBUG);
-  print META '-' x 72 . "\n";
-  print META localtime() . " $cipher\n";
+  # print "Checking $cipher\n" if ($DEBUG);
+  print META '-' x 72 . "\n" if ($DEBUG);
+  print META localtime() . " $cipher\n" if ($DEBUG);
   my @cert;
-  
-  # check TLS1.0
-  print "Checking TLS1.0 - $cipher\n" if ($DEBUG);
-  print "." if ($opt_v and !$DEBUG);
-  print META "$openssl s_client -tls1 -no_ssl2 -no_ssl3 $options -cipher $cipher -connect $host:$port\n" if ($DEBUG);
-  open (SSL1, "echo | $openssl s_client -tls1 -no_ssl2 -no_ssl3 $options -cipher $cipher -connect $host:$port 2>&1 |");
-  while (<SSL1>) {
-    chomp;
-    print META "`-TLS1:$cipher: $_\n";;
-    push(@cert, $_);
-  }
-  close(SSL1);
-  # examine what we received
-  &check_cert('TLSv1.0', $cipher, @cert);
-  print META "\n";
 
-  # clear cert between runs
-  undef @cert;
-  
-  # check TLS1.1
-  print "Checking TLS1.1 - $cipher\n" if ($DEBUG);
-  print "." if ($opt_v and !$DEBUG);
-  print META "$openssl s_client -tls1_1 -no_ssl2 -no_ssl3 $options -cipher $cipher -connect $host:$port" if ($DEBUG);
-  open (SSL1, "echo | $openssl s_client -tls1_1 -no_ssl2 -no_ssl3 $options -cipher $cipher -connect $host:$port 2>&1 |");
-  while (<SSL1>) {
-    chomp;
-    print META "`-TLS1_1:$cipher: $_\n";;
-    push(@cert, $_);
-  }
-  close(SSL1);
-  # examine what we received
-  &check_cert('TLSv1.1', $cipher, @cert);
-  print META "\n";
-
-  # clear cert between runs
-  undef @cert;
-
-  # check TLS1.2
-  print "Checking TLS1.2 - $cipher\n" if ($DEBUG);
-  print "." if ($opt_v and !$DEBUG);
-  print META "$openssl s_client -tls1_2 -no_ssl2 -no_ssl3 $options -cipher $cipher -connect $host:$port" if ($DEBUG);
-  open (SSL1, "echo | $openssl s_client -tls1_2 -no_ssl2 -no_ssl3 $options -cipher $cipher -connect $host:$port 2>&1 |");
-  while (<SSL1>) {
-    chomp;
-    print META "`-TLS1_2:$cipher: $_\n";;
-    push(@cert, $_);
-  }
-  close(SSL1);
-  # examine what we received
-  &check_cert('TLSv1.2', $cipher, @cert);
-  print META "\n";
-
-  # clear cert between runs
-  undef @cert;
-
-  if ($disable_v2 eq 'FALSE') {
-    # check SSLv2
-    print "Checking SSLv2 - $cipher\n" if ($DEBUG);
-    print "." if ($opt_v and !$DEBUG);
-    print META "$openssl s_client -ssl2 -no_tls1 -no_ssl3 $options -cipher $cipher -connect $host:$port\n" if ($DEBUG);
-    open (SSL2, "echo | $openssl s_client -ssl2 -no_tls1 -no_ssl3 $options -cipher $cipher -connect $host:$port 2>&1 |");
-    while (<SSL2>) {
+  for my $protocol (sort keys %protocols) {
+    my $command = "$openssl s_client";
+    $command .= " $protocols{$protocol}{'on'}";
+    $command .= " $options -cipher $cipher -connect $host:$port";
+    next if ($protocols{$protocol}{'support'} eq 'no');
+    # print "Checking $protocol - $cipher\n" if ($DEBUG);
+    print META '-' x 72 . "\n" if ($DEBUG);
+    print META "Checking $protocol - $cipher\n" if ($DEBUG);
+    if ($opt_v and !$DEBUG) {
+      $counter++;
+      print ".";
+      if ($counter % 50 == 0) {
+        print ":$counter\n"
+      }
+    }
+    print META "Running $command\n" if ($DEBUG);
+    open (SSL, "echo | $command 2>&1 |");
+    while (<SSL>) {
       chomp;
-      print META "`-SSLv2:$cipher: $_\n";; 
+      print META "`-$protocol:$cipher: $_\n" if ($DEBUG);
       push(@cert, $_);
     }
-    close(SSL2);
+    close(SSL);
     # examine what we received
-    &check_cert('SSLv2', $cipher, @cert);
-    print META "\n";
+    &check_cert($protocol, $cipher, @cert);
+    print META "\n" if ($DEBUG);
 
     # clear cert between runs
     undef @cert;
   }
-  
-  # check SSLv3
-  print "Checking SSLv3 - $cipher\n" if ($DEBUG);
-  print "." if ($opt_v and !$DEBUG);
-  print META "$openssl s_client -ssl3 -no_ssl2 -no_tls1 $options -cipher $cipher -connect $host:$port\n" if ($DEBUG);
-  open (SSL3, "echo | $openssl s_client -ssl3 -no_ssl2 -no_tls1 $options -cipher $cipher -connect $host:$port 2>&1 |");
-  while (<SSL3>) {
-    chomp;
-    print META "`-SSLv3:$cipher: $_\n";;
-    push(@cert, $_);
-  }
-  close(SSL3);
-  # examine what we received
-  &check_cert('SSLv3', $cipher, @cert);
 }
-print Dumper( %results ) if ($DEBUG);
+print META Dumper(\%results) if ($DEBUG);
 
-print "\n\n" if ($opt_v);
-
-# Process %results
-for my $proto (keys %results) {
-  next if ($proto ne 'SSLv3' 
-        and $proto ne 'SSLv2'
-        and $proto ne 'TLSv1.0'
-        and $proto ne 'TLSv1.1'
-        and $proto ne 'TLSv1.2');
-  for my $cipher (keys %{$results{$proto}}) {
+print "\n\nResults:\n" if ($opt_v);
+#
+# Process %results and produce output
+#
+for my $proto (keys %protocols) {
+  print META "RES: Processing $proto\n" if ($DEBUG);
+  #print META Dumper(\%{$results{$proto}}) if ($DEBUG);
+  for my $cipher (sort keys %{$results{$proto}}) {
+    if (!defined($results{$proto}{$cipher}{'enabled'})){
+      next;
+    }
+    #
+    # if the Cipher is enabled for that protocol
+    #
     if (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'}) and
-	$results{$proto}{$cipher}{'enabled'} eq 'TRUE'
-	) {
-      if ((grep(/^$cipher$/, @weak) 
+      defined($proto) and defined($cipher) and
+	    $results{$proto}{$cipher}{'enabled'} eq 'TRUE'
+	  ) {
+      #
+      # if the Cipher is weak
+      #
+      if ((grep(/^$cipher$/, @weak)
            or $proto eq 'SSLv3'
            or $proto eq 'SSLv2')) {
           if (!$opt_s) {
@@ -338,35 +390,56 @@ for my $proto (keys %results) {
       } elsif (!$opt_w) {
         print "   $proto:$cipher - ENABLED - STRONG $ciphers{$cipher} \n";
       }
+      #
+      # Show all responses enabled or not
+      #
     } elsif ($opt_a) {
-      if (grep(/^$cipher$/, @weak) 
+      #
+      # if the Cipher is weak
+      #
+      if (grep(/^$cipher$/, @weak)
           or $proto eq 'SSLv2'
           or $proto eq 'SSLv3') {
-        print "   $proto:$cipher - DISABLED - WEAK $ciphers{$cipher}  *";
-        if ($opt_v) {
+        if (!defined($ciphers{$cipher})) {
+          print "   $proto:$cipher - DISABLED or UNSUPPORTED - WEAK";
+        } else {
+          print "   $proto:$cipher - DISABLED - WEAK $ciphers{$cipher}  *";
+        }
+        if ($opt_v and $results{$proto}{$cipher}{'err'}) {
           print $results{$proto}{$cipher}{'err'};
         }
         print "\n";
       } else {
         print "   $proto:$cipher - DISABLED - STRONG $ciphers{$cipher}  *";
-        if ($opt_v) {
+        if ($opt_v and $results{$proto}{$cipher}{'err'}) {
           print $results{$proto}{$cipher}{'err'};
         }
-        print "\n";      
+        print "\n";
       }
     }
   }
-  if ($opt_v) {
+  if ($opt_v and $results{$proto}{'err'}) {
     for my $err (keys %{$results{$proto}{'error'}}) {
-      print "  Error $err: " . $results{$proto}{'error'}{$err} . "\n";
+      print "   Error $err Encountered: " . $results{$proto}{'error'}{$err} . "\n";
     }
   }
-  print "\n";
+  # print "\n";
+}
+if ($results{'key_size'} < 2048) {
+  print "Key Size is below recommended 2048 ";
+  print "Currently using " . $results{'key_size'} . "bits\n";
+}
+if ($results{'signature'}) {
+  print "\nSigning Algorithm: $results{'signature'}\n";
+  if ($results{'signature'} =~ /sha1/ or $results{'signature'} =~ /md5/) {
+    print "  The Signing Algorithm has known issues.\n"
+  }
 }
 
 if ($opt_v) {
-  print "Default (for openssl client):\n";
-  print "  $results{'default_proto'} $results{'default_cipher'}\n";
+  print "\nDefault protocol\\cipher (for openssl client):\n";
+  print "  $results{'default_proto'}\\$results{'default_cipher'}\n";
+  print "  $results{'renegoation'}\n";
   print "\n";
   print "Certificate Details:\n";
   if ($results{'key_size'} < 2048) {
@@ -375,26 +448,31 @@ if ($opt_v) {
   print "  Key Size: " . $results{'key_size'} . "bits\n";
   print "  Issuer: \n";
   for my $entry (keys %{$results{'issuer'}}) {
+    #print "--------- $entry\n";
     print "\t" . $names{$entry} . " : " . $results{'issuer'}{$entry} . "\n";
-  }          
+  }
   print "  Subject: \n";
   for my $entry (keys %{$results{'subject'}}) {
+    #print "--------- $entry\n";
     print "\t" . $names{$entry} . " : " . $results{'subject'}{$entry} . "\n";
+  }
+  if ($host ne $results{'subject'}{'CN'}){
+    print "\n**Tested name ($host) does not match Common Name ($results{'subject'}{'CN'})\n"
   }
   print "\n";
   if ($opt_g) {
-    if (-e $gnutls) { 
+    if (-e $gnutls) {
       open (TLS, "$gnutls -p $port $host |") or print "ERROR: $gnutls $!\n";
       while (<TLS>) {
-        print META "`-GNUTLS-$_";
-        if ( /^Checking/ and 
-           ( $_ !~ /for certificate informaiton/ or
-             $_ !~ /RSA\-export ciphersuite info/ or
-             $_ !~ /ephemeral Diffie Hellman group info/ or
-             $_ !~ /for trusted CAs/ )
-         ) {
+        print META "`-GNUTLS-$_" if ($DEBUG);
+#        if ( /^Checking/ and
+#           ( $_ !~ /for certificate informaiton/ or
+#             $_ !~ /RSA\-export ciphersuite info/ or
+#             $_ !~ /ephemeral Diffie Hellman group info/ or
+#             $_ !~ /for trusted CAs/ )
+#         ) {
           print $_;
-        }
+#        }
       }
       close(TLS);
     } else {
@@ -411,8 +489,9 @@ if ($results{'expired'}) {
 if ($results{'self_signed'}) {
   print "WARNING: Self Signed Certificate\n";
 }
-
+#
 # show some stats
+#
 if ( defined($results{'weak'}) and
     $results{'weak'} > 0) {
   print "*WARNING* " . $results{'weak'} . " WEAK Ciphers Enabled.\n";
@@ -424,58 +503,64 @@ if ( defined($results{'poodle'}) and
 print "Total Ciphers Enabled: " . $results{'total'} . "\n";
 my $time = time - $start;
 print "Scan took $time secs to finish\n" if ($opt_v);
-print META localtime() . " FINISHED\n";
+print META localtime() . " FINISHED\n" if ($DEBUG);
 print localtime() . " FINISHED\n" if ($opt_v);
 
+print "\n-- Check ssl_dump.log for debug info\n\n" if ($DEBUG);
 # get the F out of here
-close (META);
+close (META) if ($DEBUG);
 exit;
 
 sub check_cert {
   my ($proto, $cipher, @cert) = @_;
+  print META "-" x 72 . "\n" if ($DEBUG);
+  print META "Verifying $proto - $cipher results\n" if ($DEBUG);
   print "Verifying $proto - $cipher results\n" if ($DEBUG);
   for my $line (@cert) {
-    print META "  $line\n" if ($DEBUG);
+    print META "TEST: $line\n" if ($DEBUG);
     my $verify;
+    #
     # Deal with errors
-    if ($line =~ /^unknown option \-ssl2$/) {
-      $disable_v2 = 'TRUE';
-      print "SSLv2 disabled in Client, disabling SSLv2 check\n" if ($DEBUG);
-    } elsif ($line =~ /^\d+:error:/) {
-      my ($pid, $err, $unk, $routine, $func, 
-        $msg, $file, $line, $err_msg) = split(':', $line);
-      if ($func eq 'SSL3_READ_BYTES') {
-        if ($msg eq 'sslv3 alert handshake failure') {
-          $results{$proto}{$cipher}{'enabled'} = 'FALSE';
-          $results{$proto}{$cipher}{'err'} = 'handshake failure';
-        }
-      } elsif ($func eq 'SSL3_WRITE_BYTES') {
-        if ($msg eq 'ssl handshake failure') {
-          $results{$proto}{$cipher}{'enabled'} = 'FALSE';
-          $results{$proto}{$cipher}{'err'} = 'handshake failure';
-        }
-      } elsif ($func eq 'CLIENT_HELLO') {
-        if ($msg eq 'no ciphers available') {
-          $results{$proto}{$cipher}{'enabled'} = 'FALSE';
-          $results{$proto}{$cipher}{'err'} = 'no ciphers available';
-        }
-      } elsif ($func eq 'GET_SERVER_HELLO') {
-        if ($msg eq 'no cipher list') {
-          $results{$proto}{$cipher}{'enabled'} = 'FALSE';
-          $results{$proto}{$cipher}{'err'} = 'no cipher list';
-        }
+    #
+    if ($line =~ /^\d+:error:/) {
+      my ($pid, $err, $unk, $routine, $func,
+        $msg, $file, $lineno, $err_msg) = split(':', $line);
+      if ($err_msg eq 'Name or service not known') {
+            die "ERROR: $err_msg\nPlease check hostname ($host)\n\n";
+      } elsif ($msg eq 'Connection refused') {
+            die "ERROR: $msg\nERROR: $host:$port\n\n";
+      } elsif ($msg eq 'no ciphers available') {
+        $results{$proto}{$cipher}{'enabled'} = 'FALSE';
+        $results{$proto}{$cipher}{'err'} = 'no ciphers available';
+        print META "TEST: No Cipher Available\n" if ($DEBUG);
+        last;
+      } elsif ($msg eq 'sslv3 alert handshake failure'
+            or $msg eq 'ssl handshake failure') {
+        $results{$proto}{$cipher}{'enabled'} = 'FALSE';
+        $results{$proto}{$cipher}{'err'} = 'handshake failure';
+        print META "TEST: Handshake Failure\n" if ($DEBUG);
+        last;
+      } elsif ($msg eq 'no cipher list') {
+        $results{$proto}{$cipher}{'enabled'} = 'FALSE';
+        $results{$proto}{$cipher}{'err'} = 'no cipher list';
+        print META "TEST: No Cipher Available\n" if ($DEBUG);
+        last;
       }
+    #
+    # Everything not an error
+    #
     } elsif ($line =~ /^notAfter=(.+)$/ and !$results{'expired'}) {
-      $results{'expired'} = $1;        
+      $results{'expired'} = $1;
+      print META "TEST: CERT EXPIRED\n" if ($DEBUG);
     } elsif ($line =~ /^New, .*, Cipher is (.+)$/ and $cipher ne $1) {
       $results{$proto}{$cipher}{'enabled'} = 'FALSE';
       $results{$proto}{$cipher}{'err'} = 'cipher changed';
     } elsif ($line =~ /^(\s*)[Vv]erify return( code)?:/
         and !$results{$proto}{$cipher}{'enabled'}) {
-print META "  set-true: $proto $cipher TRUE\n";
+      print META "  set-true: $proto $cipher TRUE\n" if ($DEBUG);
       $results{$proto}{$cipher}{'enabled'} = 'TRUE';
       $results{'total'}++;
-      if (grep(/^$cipher$/, @weak) 
+      if (grep(/^$cipher$/, @weak)
           or $proto eq 'SSLv3'
           or $proto eq 'SSLv2') {
         $results{'weak'}++;
@@ -484,58 +569,60 @@ print META "  set-true: $proto $cipher TRUE\n";
         }
       }
     } elsif (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'}) and
-	$results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
+	      defined($proto) and defined($cipher) and
+	      defined($results{$proto}{$cipher}{'enabled'}) and
+	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
         $line =~ /^subject=(.+)$/ and
         !$results{'subject'} ) {
-      # Subject of Cert
+      # Subject of Cert (who it is assign to)
+      #
       my $subject = $1;
       for my $entry (split('/', $subject)) {
         next if (!$entry);
         my ($key, $val) = split('=', $entry);
-        print "$key => $val\n" if ($DEBUG);
+        print META "SET Subject $key => $val\n" if ($DEBUG);
         $results{'subject'}{$key} = $val;
       }
     } elsif (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'}) and
-	$results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
+	      defined($proto) and defined($cipher) and
+	      defined($results{$proto}{$cipher}{'enabled'}) and
+	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
         $line =~ /^issuer=(.+)$/ and
         !$results{'issuer'} ) {
       # Issuer
+      #
       my $issuer = $1;
       for my $entry (split('/', $issuer)) {
         next if (!$entry);
         my ($key, $val) = split('=', $entry);
-        print "$key => $val\n" if ($DEBUG);
+        print META "SET Issuer $key => $val\n" if ($DEBUG);
         if ($key and $val and !$results{'issuer'}{$key}) {
           $results{'issuer'}{$key} = $val;
         }
       }
     } elsif (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'}) and
-	$results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
+    	  defined($proto) and defined($cipher) and
+    	  defined($results{$proto}{$cipher}{'enabled'}) and
+	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
         $line =~ /^New, (.+), Cipher is (.+)$/ ) {
       $results{$proto}{$cipher}{'real_proto'} = $1;
       $results{$proto}{$cipher}{'real_cipher'} = $2;
     } elsif (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'}) and
-	$results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
+	      defined($proto) and defined($cipher) and
+      	defined($results{$proto}{$cipher}{'enabled'}) and
+	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
         $line =~ /^Server public key is (\d+) bit$/ ) {
       $results{'key_size'} = $1;
     } elsif (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'}) and
-	$results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
+	      defined($proto) and defined($cipher) and
+	      defined($results{$proto}{$cipher}{'enabled'}) and
+	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
         $line =~ /^    Verify return code: (\d+ .+)$/) {
       $results{$proto}{$cipher}{'return_code'} = $1;
     } elsif (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'}) and
-	$results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
+        defined($proto) and defined($cipher) and
+	      defined($results{$proto}{$cipher}{'enabled'}) and
+	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
         $line =~ /^verify error:num=(\d+):(.+)$/) {
       my $num = $1;
       my $err = $2;
@@ -544,14 +631,32 @@ print META "  set-true: $proto $cipher TRUE\n";
         $results{'self_signed'} = 'TRUE';
       }
     } elsif (
-	defined($proto) and defined($cipher) and
-	defined($results{$proto}{$cipher}{'enabled'})
-            ) {
-	print META "  ELSE case for $proto, $cipher and '".
-		$results{$proto}{$cipher}{'enabled'}."'\n";
-    }
-    else {
-	print META "  ELSE case for $proto, $cipher and 'not defined'\n";
+	      defined($proto) and defined($cipher) and
+	      defined($results{$proto}{$cipher}{'enabled'})
+      ) {
+      #print META "  ELSE case for $proto, $cipher and '" .
+		  #      $results{$proto}{$cipher}{'enabled'}."'\n" if ($DEBUG);
+    } else {
+      #print META "  ELSE case for $proto, $cipher and 'not defined'\n" if ($DEBUG);
     }
   }
+}
+
+sub parse_cert {
+  my ($cert) = @_;
+  my $pwd = $ENV{'PWD'};
+  my $certfile = "$pwd/.cert" . $$;
+  open(CERT, '>', $certfile);
+  print CERT $cert;
+  close CERT;
+  open (CERT, "$openssl x509 -in $certfile -text |") or die "ERROR $!\n";
+  while (<CERT>) {
+    # print $_;
+    if (/\s+Signature Algorithm: (.+)/) {
+      $results{'signature'} = $1;
+    }
+
+  }
+  close(CERT);
+  unlink($certfile);
 }
