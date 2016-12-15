@@ -10,6 +10,10 @@ I wanted a simple way to verify all the SSL ciphers a website could use
 vuln scanner and all the tools I could find (thanks THC) were windows 
 based. So I wrote a very simple script… ssl-cipher-check.
 <br><br>
+<b>***UPDATE 2016-12-15 v2.0***</b> Major update.  Moved to GitHub. Rewrote a lot of logic to speed up and fix errors.
+<br/>
+<br/>
+
 <b>***UPDATE 2015-02-25 v1.9***</b> Kurt at FreeBSD.org sent a patch to clean up my code to utilise 'use strict' and 'use warnings'  
 <br/>I appreciate it, as I am lazy<br/> 
 <br/>
@@ -296,5 +300,4 @@ Mon Mar 16 13:30:06 2009 FINISHED
 <!--#include virtual="CHANGELOG"-->
 </pre>
 </div>
-
 
