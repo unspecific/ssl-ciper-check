@@ -60,6 +60,7 @@ use warnings;
 use strict;
 use Data::Dumper;
 use Getopt::Std;
+use Socket qw(:DEFAULT :crlf);
 
 my $openssl = '/usr/bin/openssl';
 my $gnutls = '/usr/bin/gnutls-cli-debug';
@@ -107,8 +108,7 @@ my $protocol_count = 5;
 
 ###########################################################################
 
-my $VERSION = '2.0';
-
+my $VERSION = '2.1';
 
 my $host;
 my %opts;
@@ -251,6 +251,7 @@ my %saw;
 my $pci = 0;
 my %results;
 
+$results{'SSLv3'}{'unknown'}{'enabled'} = &check_sslv3($host, $port);
 # remove duplicate ciphers
 @ciphers = grep(!$saw{$_}++, @ciphers);
 
@@ -435,7 +436,9 @@ if ($results{'signature'}) {
     print "  The Signing Algorithm has known issues.\n"
   }
 }
-
+if ($results{'SSLv3'}{'unknown'}{'enabled'} eq 'TRUE') {
+  print "***SSLv3 Enabled - Vulnerbale to POODLE\n\n"
+}
 if ($opt_v) {
   print "\nDefault protocol\\cipher (for openssl client):\n";
   print "  $results{'default_proto'}\\$results{'default_cipher'}\n";
@@ -659,4 +662,37 @@ sub parse_cert {
   }
   close(CERT);
   unlink($certfile);
+}
+
+sub check_sslv3 {
+  my ($host, $port) = @_;
+  my ($name,$aliases,$type,$len,@thisaddr) = gethostbyname($host);
+  my ($a,$b,$c,$d) = unpack('C4',$thisaddr[0]);
+  my $server_ip_address = "$a.$b.$c.$d";
+  my $sslv3;
+  my $data;
+  $ciphers{'unknown'} = 'unknown';
+  socket(SOCK,PF_INET,SOCK_STREAM,(getprotobyname('tcp'))[2])
+     or die "Can't create a socket $!\n";
+  connect( SOCK, pack_sockaddr_in($port, inet_aton($server_ip_address)))
+     or die "Can't connect to port $port! \n";
+  print META "Connected. Port $port open on $host($server_ip_address)\n" if ($DEBUG);
+  send(SOCK, pack("H*", "160300007f0100007b030058519b8d96f54eaabf8919a46dc84abf9f27da764863acfb2f8929ba6b5e412100005400040005000a000d001000130016002f0030003100320033003500360037003800390041004400450066008400870088009600ffc002c003c004c005c007c008c009c00ac00cc00dc00ec00fc011c012c013c0140100"), 0);
+  recv(SOCK,$data,4010,0); # or die "Error: $! $$";
+  if (length($data) > 12) {
+    if (substr($data, 0, 3) eq pack("H*", "160300")
+        and substr($data, 5, 1) eq pack("H*", "02")
+        and substr($data, 9, 2) eq pack("H*", "0300")) {
+      print META "SSLv3.0 enabled on $host\n" if ($DEBUG);
+      $sslv3 = "TRUE";
+    } else {
+      print unpack("H*", substr($data, 9, 2));
+    }
+  } else {
+    print META "SSLv3 not enabled on $host" if ($DEBUG);
+    $sslv3 = "FALSE";
+  }
+  # print unpack("H*", $data);
+  close (SOCK);
+  return($sslv3);
 }
