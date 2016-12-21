@@ -171,7 +171,7 @@ print "Testing $host:$port\n";
 
 if ($opt_v) {
   print " : SSL Cipher Check: $VERSION\n";
-  print " :  - http://www.unspecific.com/ssl/\n";
+  print " :  - https://github.com/unspecific/ssl-ciper-check\n";
   open (SSL, "$openssl version|") or die "$!\n";
   while (<SSL>) {
     print "Testing with $_";
@@ -412,13 +412,13 @@ for my $proto (sort keys %protocols) {
             print "** $proto:$cipher - ENABLED - WEAK $ciphers{$cipher} **";
           }
           if ($opt_v and $results{$proto}{$cipher}{'err'}) {
-            print "\n   ^Error" . $results{$proto}{$cipher}{'err'};
+            print "\n   ^^Error: " . $results{$proto}{$cipher}{'err'};
           }
           print "\n";
       } elsif (!$opt_w) {
         print "   $proto:$cipher - ENABLED - STRONG $ciphers{$cipher}";
         if ($opt_v and $results{$proto}{$cipher}{'err'}) {
-          print "\n   ^Error" . $results{$proto}{$cipher}{'err'};
+          print "\n   ^^Error: " . $results{$proto}{$cipher}{'err'};
         }
         print "\n";
       }
@@ -556,8 +556,8 @@ exit;
 sub check_cert {
   my ($proto, $cipher, @cert) = @_;
   print META "-" x 72 . "\n" if ($DEBUG);
-  print META "Verifying $proto - $cipher results\n" if ($DEBUG);
-  print "Verifying $proto - $cipher results\n" if ($DEBUG);
+  print META "Verifying $proto - $cipher\n" if ($DEBUG);
+  print "Verifying $proto - $cipher\n" if ($DEBUG);
   for my $line (@cert) {
     print META "TEST: $line\n" if ($DEBUG);
     my $verify;
@@ -656,8 +656,8 @@ sub check_cert {
       if ($1 ne $proto or $2 ne $cipher) {
         $results{$proto}{$cipher}{'real_proto'} = $1;
         $results{$proto}{$cipher}{'real_cipher'} = $2;
-        $results{$1}{$2}{'enabled'} = 'TRUE';
-        $results{$1}{$2}{'err'} = "^Changed from $proto:$2";
+        # $results{$1}{$2}{'enabled'} = 'TRUE';
+        # $results{$1}{$2}{'err'} = "Changed from $proto:$2";
       }
     } elsif (
 	      defined($proto) and defined($cipher) and
@@ -729,6 +729,7 @@ sub check_sslv3 {
   send(SOCK, pack("H*", "160300007f0100007b030058519b8d96f54eaabf8919a46dc84abf9f27da764863acfb2f8929ba6b5e412100005400040005000a000d001000130016002f0030003100320033003500360037003800390041004400450066008400870088009600ffc002c003c004c005c007c008c009c00ac00cc00dc00ec00fc011c012c013c0140100"), 0);
   recv(SOCK,$data,4010,0); # or return("FALSE");
   if (defined($data) and length($data) > 1) {
+    print META unpack("H*", $data);
     if (substr($data, 0, 3) eq pack("H*", "160300")
         and substr($data, 5, 1) eq pack("H*", "02")
         and substr($data, 9, 2) eq pack("H*", "0300")) {
