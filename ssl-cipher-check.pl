@@ -178,6 +178,14 @@ if ($opt_v) {
   }
   close (SSL);
 }
+
+####
+#
+#  Testing port is running SSL at all
+#
+#
+check_ssl($host, $port);
+
 ####
 #
 #  Testing for support of specific protocols as outlined above
@@ -452,12 +460,16 @@ if ($opt_v) {
   print "  Issuer: \n";
   for my $entry (keys %{$results{'issuer'}}) {
     #print "--------- $entry\n";
-    print "\t" . $names{$entry} . " : " . $results{'issuer'}{$entry} . "\n";
+    if (defined($names{$entry}) and defined($results{'issuer'}{$entry})) {
+      print "\t" . $names{$entry} . " : " . $results{'issuer'}{$entry} . "\n";
+    }
   }
   print "  Subject: \n";
   for my $entry (keys %{$results{'subject'}}) {
     #print "--------- $entry\n";
-    print "\t" . $names{$entry} . " : " . $results{'subject'}{$entry} . "\n";
+    if (defined($names{$entry}) and defined($results{'subject'}{$entry})) {
+      print "\t" . $names{$entry} . " : " . $results{'subject'}{$entry} . "\n";
+    }
   }
   if ($host ne $results{'subject'}{'CN'}){
     print "\n**Tested name ($host) does not match Common Name ($results{'subject'}{'CN'})\n"
@@ -686,13 +698,49 @@ sub check_sslv3 {
       print META "SSLv3.0 enabled on $host\n" if ($DEBUG);
       $sslv3 = "TRUE";
     } else {
-      print unpack("H*", substr($data, 9, 2));
+      if ($DEBUG) {
+        print META "SSL check returned unknown response for protocol version: ";
+        print META unpack("H*", substr($data, 9, 2));
+      } elsif ($opt_v) {
+        print "Not running SSLv3\n";
+      }
     }
   } else {
-    print META "SSLv3 not enabled on $host" if ($DEBUG);
+    print META "SSLv3 not enabled on $host\n" if ($DEBUG);
     $sslv3 = "FALSE";
   }
   # print unpack("H*", $data);
   close (SOCK);
   return($sslv3);
+}
+
+sub check_ssl {
+  my ($host, $port) = @_;
+  my ($name,$aliases,$type,$len,@thisaddr) = gethostbyname($host);
+  my ($a,$b,$c,$d) = unpack('C4',$thisaddr[0]);
+  my $server_ip_address = "$a.$b.$c.$d";
+  my $ssl;
+  my $data;
+  socket(SOCK,PF_INET,SOCK_STREAM,(getprotobyname('tcp'))[2])
+     or die "Can't create a socket $!\n";
+  connect( SOCK, pack_sockaddr_in($port, inet_aton($server_ip_address)))
+     or die "Can't connect to port $port! \n";
+  print META "Connected. Port $port open on $host($server_ip_address)\n" if ($DEBUG);
+  send(SOCK, pack("H*", "160300007f0100007b030058519b8d96f54eaabf8919a46dc84abf9f27da764863acfb2f8929ba6b5e412100005400040005000a000d001000130016002f0030003100320033003500360037003800390041004400450066008400870088009600ffc002c003c004c005c007c008c009c00ac00cc00dc00ec00fc011c012c013c0140100"), 0);
+  recv(SOCK,$data,4010,0); # or die "Error: $! $$";
+  if (substr($data, 0, 3) eq pack("H*", "160300")
+      and substr($data, 5, 1) eq pack("H*", "02")) {
+    print META "Appears SSL is enabled on $host:$port\n" if ($DEBUG);
+  } else {
+    if ($DEBUG) {
+      print META "SSL check returned unknown response: ";
+      print META length($data) . " bytes returned\n";
+      print META "$data";
+    }
+    close (SOCK);
+    die "SSL is not running on $host:$port, please select another target\n";
+  }
+  # print unpack("H*", $data);
+  close (SOCK);
+  return();
 }
