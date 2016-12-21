@@ -691,21 +691,18 @@ sub check_sslv3 {
   print META "Connected. Port $port open on $host($server_ip_address)\n" if ($DEBUG);
   send(SOCK, pack("H*", "160300007f0100007b030058519b8d96f54eaabf8919a46dc84abf9f27da764863acfb2f8929ba6b5e412100005400040005000a000d001000130016002f0030003100320033003500360037003800390041004400450066008400870088009600ffc002c003c004c005c007c008c009c00ac00cc00dc00ec00fc011c012c013c0140100"), 0);
   recv(SOCK,$data,4010,0); # or die "Error: $! $$";
-  if (length($data) > 12) {
-    if (substr($data, 0, 3) eq pack("H*", "160300")
-        and substr($data, 5, 1) eq pack("H*", "02")
-        and substr($data, 9, 2) eq pack("H*", "0300")) {
-      print META "SSLv3.0 enabled on $host\n" if ($DEBUG);
-      $sslv3 = "TRUE";
-    } else {
-      if ($DEBUG) {
-        print META "SSL check returned unknown response for protocol version: ";
-        print META unpack("H*", substr($data, 9, 2));
-      } elsif ($opt_v) {
-        print "Not running SSLv3\n";
-      }
-    }
+  if (substr($data, 0, 3) eq pack("H*", "160300")
+      and substr($data, 5, 1) eq pack("H*", "02")
+      and substr($data, 9, 2) eq pack("H*", "0300")) {
+    print META "SSLv3.0 enabled on $host\n" if ($DEBUG);
+    $sslv3 = "TRUE";
   } else {
+    if ($DEBUG) {
+      print META "SSL check returned unknown response for protocol version: ";
+      print META unpack("H*", substr($data, 9, 2));
+    } elsif ($opt_v) {
+      print "Not running SSLv3\n";
+    }
     print META "SSLv3 not enabled on $host\n" if ($DEBUG);
     $sslv3 = "FALSE";
   }
@@ -726,9 +723,11 @@ sub check_ssl {
   connect( SOCK, pack_sockaddr_in($port, inet_aton($server_ip_address)))
      or die "Can't connect to port $port! \n";
   print META "Connected. Port $port open on $host($server_ip_address)\n" if ($DEBUG);
-  send(SOCK, pack("H*", "160300007f0100007b030058519b8d96f54eaabf8919a46dc84abf9f27da764863acfb2f8929ba6b5e412100005400040005000a000d001000130016002f0030003100320033003500360037003800390041004400450066008400870088009600ffc002c003c004c005c007c008c009c00ac00cc00dc00ec00fc011c012c013c0140100"), 0);
+  # send TLS 1.2 handshake
+  send(SOCK, pack("H*", "1603010200010001fc03032e7fdfe37b572b61bb05e2d5922c5270dcfbf60141cbc3fb864954cb4fa2d210209c4b522e63d59a907105c307221478c807f9ddcde0a977fd3a0ef3c131c3551800242a2ac02bc02fc02cc030cca9cca8cc14cc13c009c013c00ac014009c009d002f0035000a0100018fdada0000ff0100010000170000002300c0d4d0dd75f8b6c78841e803fc6048aa94bdc97f5ee6a34e7ba14910fa08dcba2e3bec821ba94b50e236a691e53cf7efc736bb9f515bda1ac80024e55fa7e8cffce4f8a293c159c1d9c5f69efb70a5f6ebe2e66c37683008641adae41999422432a37c9ea0192fe3058f9fb70260e4de260ae3f566c10393b6cc6db79e1c35a78a90470ee81c1f817a05284cf0dee8fffc6817e5c2738b4c442245c10be6d887b728c66c1cbb2ded4f814411fb44da988fe5dc4c01e672ff5e8ac354e1c6e2f9ba000d0012001006010603050105030401040302010203000500050100000000001200000010000e000c02683208687474702f312e3175500000000b00020100000a000a00087a7a001d00170018eaea000100001500680000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000"), 0);
   recv(SOCK,$data,4010,0); # or die "Error: $! $$";
-  if (substr($data, 0, 3) eq pack("H*", "160300")
+  # did we get a tls 1.* response?
+  if (substr($data, 0, 2) eq pack("H*", "1603")
       and substr($data, 5, 1) eq pack("H*", "02")) {
     print META "Appears SSL is enabled on $host:$port\n" if ($DEBUG);
   } else {

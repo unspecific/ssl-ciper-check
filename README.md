@@ -5,11 +5,14 @@
 A quick and easy way to verify what Ciphers are supported on a server.<br><br>
 
 <b>ssl-cipher-check.pl</b><br>
-I wanted a simple way to verify all the SSL ciphers a website could use 
-(thanks PCI). I just needed something simple, not running a full blown 
-vuln scanner and all the tools I could find (thanks THC) were windows 
+I wanted a simple way to verify all the SSL ciphers a website could use
+(thanks PCI). I just needed something simple, not running a full blown
+vuln scanner and all the tools I could find (thanks THC) were windows
 based. So I wrote a very simple script… ssl-cipher-check.
 
+<br><br>
+<b>***UPDATE 2016-12-21 v2.2***</b> Logic fail had to be fixed. Testing for SSL with newest protocol and fallback to earlier.
+<br/>
 <br><br>
 <b>***UPDATE 2016-12-21 v2.1***</b> Fixed an error when scanning non-ssl port<br/>
 added checking for SSL before scanning<br/>
@@ -21,9 +24,9 @@ added checking for SSL before scanning<br/>
 <br/>
 
 <b>***UPDATE 2015-02-25 v1.9***</b> Kurt at FreeBSD.org sent a patch to clean up my code to utilise 'use strict' and 'use warnings'  
-<br/>I appreciate it, as I am lazy<br/> 
+<br/>I appreciate it, as I am lazy<br/>
 <br/>
-<b>***UPDATE 2014-10-16 v1.8***</b> Added TLS1.1 &amp; 1.2 support and added SSLv3 as weak, plus POODLE identification.<br/> 
+<b>***UPDATE 2014-10-16 v1.8***</b> Added TLS1.1 &amp; 1.2 support and added SSLv3 as weak, plus POODLE identification.<br/>
 Added -g flag to run glutls debug util seperately.<br>
 <br/>
 <b>***NOTE***</b> Steve Zenone wrote a good article on his <a href=http://www.transindiaacquisition.com/>blog</a> about how and why of this stuff...  
@@ -37,11 +40,11 @@ There were some different output in some versions of OpenSSL so the patch dealt 
 " For some cipher combinations, OpenSSL will return a "verify return" command but then later on fail with the "no cipher list" error. Since you check the former and not the latter, you false positive on these ciphers. "<br>
 His patch has been applied and all is working well.
 <br><br>
-It starts by pulling a list of all the ciphers supported by the openssl 
+It starts by pulling a list of all the ciphers supported by the openssl
 client.  The number of checks it does is all dependant on the version and
 configuration of OpenSSL on your machine.  It does include NULL checks as well.
 On a CentOS server, this includes:<br>
-ADH-AES256-SHA, DHE-RSA-AES256-SHA, DHE-DSS-AES256-SHA, AES256-SHA, ADH-AES128-SHA, DHE-RSA-AES128-SHA, 
+ADH-AES256-SHA, DHE-RSA-AES256-SHA, DHE-DSS-AES256-SHA, AES256-SHA, ADH-AES128-SHA, DHE-RSA-AES128-SHA,
 DHE-DSS-AES128-SHA, AES128-SHA, DHE-DSS-RC4-SHA, EXP1024-DHE-DSS-RC4-SHA, EXP1024-RC4-SHA, EXP1024-DHE-D
 SS-DES-CBC-SHA, EXP1024-DES-CBC-SHA, EXP1024-RC2-CBC-MD5, EXP1024-RC4-MD5, EXP-KRB5-RC4-MD5, EXP-KRB5-RC
 2-CBC-MD5, EXP-KRB5-DES-CBC-MD5, EXP-KRB5-RC4-SHA, EXP-KRB5-RC2-CBC-SHA, EXP-KRB5-DES-CBC-SHA, KRB5-RC4-
@@ -55,17 +58,17 @@ The script will connect first without specifying the Cipher or protocol.
 This will allow us to determine the default Cipher/Proto combination
 used  for the server.
 <br><br>
-Then the script tries to connect to the server, on the specified port or 
-443 if a port is not given, and record the output to a log file called 
-ssl_dump.log.  Because all of this happens before any protocol specific 
+Then the script tries to connect to the server, on the specified port or
+443 if a port is not given, and record the output to a log file called
+ssl_dump.log.  Because all of this happens before any protocol specific
 commands, this will work with HTTP, POP, IMAP or any SSL enable protocol.
 <br><br>
-Below you will find a sample ssl_dump.log, the script itself and a script 
+Below you will find a sample ssl_dump.log, the script itself and a script
 to grab a list of CA certs for verifying the SSL cert signature. Below
 that is some sample output.  
 <br><br>
-I also did a presentation at <a href=http://dc214.org/>DC214</a> on 
-March 11, 2009, explaining what SSL is and the tool.  Most of the 
+I also did a presentation at <a href=http://dc214.org/>DC214</a> on
+March 11, 2009, explaining what SSL is and the tool.  Most of the
 presentation was live demos, so the <a href=http://dc214.org/.go/presentations#mar2009>slides</a>
 are very simple.
 <br><br>
@@ -73,9 +76,9 @@ As always feedback is welcome.
 
 <br><br>
 <b>mkcabundle.pl</b><br>
-126 CA supported.  mkcabundle.pl was writen by Joe Orton and sent to 
-modssl_users.  The script logs into the Mozilla anonymous CVS server 
-(so cvs must be installed) and downloads the lastest list of CA distributed 
+126 CA supported.  mkcabundle.pl was writen by Joe Orton and sent to
+modssl_users.  The script logs into the Mozilla anonymous CVS server
+(so cvs must be installed) and downloads the lastest list of CA distributed
 with Firefox and other Mozilla products.
 <pre> perl ./mkcabundle.pl > ca-bundle.crt </pre>
 <a name=download><hr><center> <a href=#top>Top</a> | <a href=#download>Download</a> | <a href=#usage>Usage</a> | <a href=#changelog>ChangeLog</a> </center><hr>
@@ -86,7 +89,7 @@ with Firefox and other Mozilla products.
 <a name=usage><hr><center> <a href=#top>Top</a> | <a href=#download>Download</a> | <a href=#usage>Usage</a> | <a href=#changelog>ChangeLog</a> </center><hr>
 <h3>Usage:</h3>
 <pre>
-$ perl ./ssl-cipher-check.pl 
+$ perl ./ssl-cipher-check.pl
  : SSL Cipher Check: 1.2
  : written by Lee 'MadHat' Heath (at) Unspecific.com
 Usage:
@@ -104,25 +107,25 @@ default port is 443
 <pre>
 $ perl ./ssl-cipher-check.pl mail.yahoo.com
 Testing mail.yahoo.com:443
-   SSLv3:RC4-MD5 - ENABLED - STRONG 128 bits 
-   SSLv3:DES-CBC3-SHA - ENABLED - STRONG 168 bits 
-   SSLv3:RC4-SHA - ENABLED - STRONG 128 bits 
+   SSLv3:RC4-MD5 - ENABLED - STRONG 128 bits
+   SSLv3:DES-CBC3-SHA - ENABLED - STRONG 168 bits
+   SSLv3:RC4-SHA - ENABLED - STRONG 128 bits
 ** SSLv3:DES-CBC-SHA - ENABLED - WEAK 56 bits **
 ** SSLv3:EXP-RC4-MD5 - ENABLED - WEAK 40 bits **
 ** SSLv3:EXP-DES-CBC-SHA - ENABLED - WEAK 40 bits **
 ** SSLv3:EXP-RC2-CBC-MD5 - ENABLED - WEAK 40 bits **
-   SSLv3:AES128-SHA - ENABLED - STRONG 128 bits 
-   SSLv3:AES256-SHA - ENABLED - STRONG 256 bits 
+   SSLv3:AES128-SHA - ENABLED - STRONG 128 bits
+   SSLv3:AES256-SHA - ENABLED - STRONG 256 bits
 
-   TLSv1:RC4-MD5 - ENABLED - STRONG 128 bits 
-   TLSv1:DES-CBC3-SHA - ENABLED - STRONG 168 bits 
-   TLSv1:RC4-SHA - ENABLED - STRONG 128 bits 
+   TLSv1:RC4-MD5 - ENABLED - STRONG 128 bits
+   TLSv1:DES-CBC3-SHA - ENABLED - STRONG 168 bits
+   TLSv1:RC4-SHA - ENABLED - STRONG 128 bits
 ** TLSv1:DES-CBC-SHA - ENABLED - WEAK 56 bits **
 ** TLSv1:EXP-RC4-MD5 - ENABLED - WEAK 40 bits **
 ** TLSv1:EXP-DES-CBC-SHA - ENABLED - WEAK 40 bits **
 ** TLSv1:EXP-RC2-CBC-MD5 - ENABLED - WEAK 40 bits **
-   TLSv1:AES128-SHA - ENABLED - STRONG 128 bits 
-   TLSv1:AES256-SHA - ENABLED - STRONG 256 bits 
+   TLSv1:AES128-SHA - ENABLED - STRONG 128 bits
+   TLSv1:AES256-SHA - ENABLED - STRONG 256 bits
 
 ** SSLv2:RC4-MD5 - ENABLED - WEAK 128 bits **
 ** SSLv2:RC2-CBC-MD5 - ENABLED - WEAK 128 bits **
@@ -145,26 +148,26 @@ Testing with OpenSSL 0.9.8g 19 Oct 2007
 Running a total of 105 scans
 ............................................................................................................
 
-   SSLv3:RC4-MD5 - ENABLED - STRONG 128 bits 
-   SSLv3:DES-CBC3-SHA - ENABLED - STRONG 168 bits 
-   SSLv3:RC4-SHA - ENABLED - STRONG 128 bits 
+   SSLv3:RC4-MD5 - ENABLED - STRONG 128 bits
+   SSLv3:DES-CBC3-SHA - ENABLED - STRONG 168 bits
+   SSLv3:RC4-SHA - ENABLED - STRONG 128 bits
 ** SSLv3:DES-CBC-SHA - ENABLED - WEAK 56 bits **
 ** SSLv3:EXP-RC4-MD5 - ENABLED - WEAK 40 bits **
 ** SSLv3:EXP-DES-CBC-SHA - ENABLED - WEAK 40 bits **
 ** SSLv3:EXP-RC2-CBC-MD5 - ENABLED - WEAK 40 bits **
-   SSLv3:AES128-SHA - ENABLED - STRONG 128 bits 
-   SSLv3:AES256-SHA - ENABLED - STRONG 256 bits 
+   SSLv3:AES128-SHA - ENABLED - STRONG 128 bits
+   SSLv3:AES256-SHA - ENABLED - STRONG 256 bits
   Error 20: unable to get local issuer certificate
 
-   TLSv1:RC4-MD5 - ENABLED - STRONG 128 bits 
-   TLSv1:DES-CBC3-SHA - ENABLED - STRONG 168 bits 
-   TLSv1:RC4-SHA - ENABLED - STRONG 128 bits 
+   TLSv1:RC4-MD5 - ENABLED - STRONG 128 bits
+   TLSv1:DES-CBC3-SHA - ENABLED - STRONG 168 bits
+   TLSv1:RC4-SHA - ENABLED - STRONG 128 bits
 ** TLSv1:DES-CBC-SHA - ENABLED - WEAK 56 bits **
 ** TLSv1:EXP-RC4-MD5 - ENABLED - WEAK 40 bits **
 ** TLSv1:EXP-DES-CBC-SHA - ENABLED - WEAK 40 bits **
 ** TLSv1:EXP-RC2-CBC-MD5 - ENABLED - WEAK 40 bits **
-   TLSv1:AES128-SHA - ENABLED - STRONG 128 bits 
-   TLSv1:AES256-SHA - ENABLED - STRONG 256 bits 
+   TLSv1:AES128-SHA - ENABLED - STRONG 128 bits
+   TLSv1:AES256-SHA - ENABLED - STRONG 256 bits
   Error 20: unable to get local issuer certificate
 
 ** SSLv2:RC4-MD5 - ENABLED - WEAK 128 bits **
@@ -182,11 +185,11 @@ Default:
 
 Certificate Details:
   Key Size: 1024bits
-  Issuer: 
+  Issuer:
 	Common Name (CN) : Akamai Subordinate CA 3
 	Company (O) : Akamai Technologies Inc
 	Country (C) : US
-  Subject: 
+  Subject:
 	Common Name (CN) : usa.visa.com
 	State (ST) : California
 	Company (O) : Visa International Service Association
@@ -240,25 +243,25 @@ Testing with OpenSSL 0.9.8g 19 Oct 2007
 Running a total of 105 scans
 ............................................................................................................
 
-   SSLv3:RC4-MD5 - ENABLED - STRONG 128 bits 
-   SSLv3:DES-CBC3-SHA - ENABLED - STRONG 168 bits 
-   SSLv3:RC4-SHA - ENABLED - STRONG 128 bits 
+   SSLv3:RC4-MD5 - ENABLED - STRONG 128 bits
+   SSLv3:DES-CBC3-SHA - ENABLED - STRONG 168 bits
+   SSLv3:RC4-SHA - ENABLED - STRONG 128 bits
 ** SSLv3:EXP-RC4-MD5 - ENABLED - WEAK 40 bits **
 ** SSLv3:EXP-DES-CBC-SHA - ENABLED - WEAK 40 bits **
 ** SSLv3:EXP-RC2-CBC-MD5 - ENABLED - WEAK 40 bits **
-   SSLv3:AES128-SHA - ENABLED - STRONG 128 bits 
-   SSLv3:AES256-SHA - ENABLED - STRONG 256 bits 
+   SSLv3:AES128-SHA - ENABLED - STRONG 128 bits
+   SSLv3:AES256-SHA - ENABLED - STRONG 256 bits
   Error 18: self signed certificate
   Error 10: certificate has expired
 
-   TLSv1:RC4-MD5 - ENABLED - STRONG 128 bits 
-   TLSv1:DES-CBC3-SHA - ENABLED - STRONG 168 bits 
-   TLSv1:RC4-SHA - ENABLED - STRONG 128 bits 
+   TLSv1:RC4-MD5 - ENABLED - STRONG 128 bits
+   TLSv1:DES-CBC3-SHA - ENABLED - STRONG 168 bits
+   TLSv1:RC4-SHA - ENABLED - STRONG 128 bits
 ** TLSv1:EXP-RC4-MD5 - ENABLED - WEAK 40 bits **
 ** TLSv1:EXP-DES-CBC-SHA - ENABLED - WEAK 40 bits **
 ** TLSv1:EXP-RC2-CBC-MD5 - ENABLED - WEAK 40 bits **
-   TLSv1:AES128-SHA - ENABLED - STRONG 128 bits 
-   TLSv1:AES256-SHA - ENABLED - STRONG 256 bits 
+   TLSv1:AES128-SHA - ENABLED - STRONG 128 bits
+   TLSv1:AES256-SHA - ENABLED - STRONG 256 bits
   Error 18: self signed certificate
   Error 10: certificate has expired
 
@@ -275,7 +278,7 @@ Default:
 
 Certificate Details:
   Key Size: 1024bits
-  Issuer: 
+  Issuer:
 	Common Name (CN) : mail2.unspecific.com
 	Company (O) : Unspecific
 	State (ST) : Texas
@@ -283,7 +286,7 @@ Certificate Details:
 	Contact : madhat@unspecific.com
 	Country (C) : US
 	City (L) : Dallas
-  Subject: 
+  Subject:
 	Common Name (CN) : mail2.unspecific.com
 	Company (O) : Unspecific
 	State (ST) : Texas
@@ -306,4 +309,3 @@ Mon Mar 16 13:30:06 2009 FINISHED
 <!--#include virtual="CHANGELOG"-->
 </pre>
 </div>
-
