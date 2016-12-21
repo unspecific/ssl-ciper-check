@@ -3,7 +3,7 @@
 #---------------------------------------
 # SSL Cipher Check
 #   Writen by Lee 'MadHat' Heath (madhat@unspecific.com)
-# http://www.unspecific.com/ssl/
+# https://github.com/unspecific/ssl-ciper-check
 #
 # Patches/fixes provided by:
 #   markus.theissinger in .de
@@ -125,7 +125,7 @@ my $opt_w = $opts{'w'};
 if (!$ARGV[0]) {
   print " : SSL Cipher Check: $VERSION\n";
   print " : written by Lee 'MadHat' Heath (at) Unspecific.com\n";
-  print " :  - http://www.unspecific.com/ssl/\n";
+  print " :  - https://github.com/unspecific/ssl-ciper-check\n";
   print "Usage:\n";
   print "  $0 [ -dgvwas ] <host> [<port>]\n";
   print "default port is 443\n";
@@ -200,6 +200,12 @@ for my $protocol (sort keys %protocols) {
       print "openssl s_client does not support $protocol\n" if ($opt_v);
       print META "openssl s_client does not support $protocol\n" if ($DEBUG);
       $protocols{$protocol}{'support'} = 'no';
+      if ($protocol eq 'SSLv2' and $opt_v) {
+        print "-- Using built in check for SSLv2\n";
+      } elsif ($protocol eq 'SSLv3' and $opt_v) {
+        print "-- Using built in check for SSLv3\n";
+      }
+
       $protocol_count--;
     }
   }
@@ -258,8 +264,17 @@ close (SSL);
 my %saw;
 my $pci = 0;
 my %results;
-
-$results{'SSLv3'}{'unknown'}{'enabled'} = &check_sslv3($host, $port);
+####
+#
+#  Testing SSLv2 and SSLv3 via socket
+#
+#
+if ($protocols{'SSLv2'}{'support'} eq 'no') {
+  $results{'SSLv2'}{'DEFAULT'}{'enabled'} = &check_sslv2($host, $port);
+}
+if ($protocols{'SSLv3'}{'support'} eq 'no') {
+  $results{'SSLv3'}{'DEFAULT'}{'enabled'} = &check_sslv3($host, $port);
+}
 # remove duplicate ciphers
 @ciphers = grep(!$saw{$_}++, @ciphers);
 
@@ -373,7 +388,7 @@ print "\n\nResults:\n" if ($opt_v);
 #
 # Process %results and produce output
 #
-for my $proto (keys %protocols) {
+for my $proto (sort keys %protocols) {
   print META "RES: Processing $proto\n" if ($DEBUG);
   #print META Dumper(\%{$results{$proto}}) if ($DEBUG);
   for my $cipher (sort keys %{$results{$proto}}) {
@@ -394,12 +409,19 @@ for my $proto (keys %protocols) {
            or $proto eq 'SSLv3'
            or $proto eq 'SSLv2')) {
           if (!$opt_s) {
-            print "** $proto:$cipher - ENABLED - WEAK $ciphers{$cipher} **\n";
+            print "** $proto:$cipher - ENABLED - WEAK $ciphers{$cipher} **";
           }
+          if ($opt_v and $results{$proto}{$cipher}{'err'}) {
+            print "\n   ^Error" . $results{$proto}{$cipher}{'err'};
+          }
+          print "\n";
       } elsif (!$opt_w) {
-        print "   $proto:$cipher - ENABLED - STRONG $ciphers{$cipher} \n";
+        print "   $proto:$cipher - ENABLED - STRONG $ciphers{$cipher}";
+        if ($opt_v and $results{$proto}{$cipher}{'err'}) {
+          print "\n   ^Error" . $results{$proto}{$cipher}{'err'};
+        }
+        print "\n";
       }
-      #
       # Show all responses enabled or not
       #
     } elsif ($opt_a) {
@@ -444,7 +466,12 @@ if ($results{'signature'}) {
     print "  The Signing Algorithm has known issues.\n"
   }
 }
-if ($results{'SSLv3'}{'unknown'}{'enabled'} eq 'TRUE') {
+if (defined($results{'SSLv2'}{'DEFAULT'}{'enabled'}) and
+    $results{'SSLv2'}{'DEFAULT'}{'enabled'} eq 'TRUE') {
+  print "***SSLv2 Enabled - Just BROKEN\n\n"
+}
+if (defined($results{'SSLv3'}{'DEFAULT'}{'enabled'}) and
+    $results{'SSLv3'}{'DEFAULT'}{'enabled'} eq 'TRUE') {
   print "***SSLv3 Enabled - Vulnerbale to POODLE\n\n"
 }
 if ($opt_v) {
@@ -587,16 +614,20 @@ sub check_cert {
 	      defined($proto) and defined($cipher) and
 	      defined($results{$proto}{$cipher}{'enabled'}) and
 	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
-        $line =~ /^subject=(.+)$/ and
+        $line =~ /^subject=?(.+)$/ and
         !$results{'subject'} ) {
       # Subject of Cert (who it is assign to)
       #
       my $subject = $1;
+      # print META "\$proto = $proto, \$cipher = $cipher\n" if ($DEBUG);
       for my $entry (split('/', $subject)) {
+        # print META "\$entry = $entry\n" if ($DEBUG);
         next if (!$entry);
         my ($key, $val) = split('=', $entry);
-        print META "SET Subject $key => $val\n" if ($DEBUG);
-        $results{'subject'}{$key} = $val;
+        if (defined($key) and defined($val)) {
+          print META "SET Subject $key => $val\n" if ($DEBUG);
+          $results{'subject'}{$key} = $val;
+        }
       }
     } elsif (
 	      defined($proto) and defined($cipher) and
@@ -610,9 +641,11 @@ sub check_cert {
       for my $entry (split('/', $issuer)) {
         next if (!$entry);
         my ($key, $val) = split('=', $entry);
-        print META "SET Issuer $key => $val\n" if ($DEBUG);
-        if ($key and $val and !$results{'issuer'}{$key}) {
-          $results{'issuer'}{$key} = $val;
+        if (defined($key) and defined($val)) {
+          print META "SET Issuer $key => $val\n" if ($DEBUG);
+          if ($key and $val and !$results{'issuer'}{$key}) {
+            $results{'issuer'}{$key} = $val;
+          }
         }
       }
     } elsif (
@@ -620,8 +653,12 @@ sub check_cert {
     	  defined($results{$proto}{$cipher}{'enabled'}) and
 	      $results{$proto}{$cipher}{'enabled'} eq 'TRUE' and
         $line =~ /^New, (.+), Cipher is (.+)$/ ) {
-      $results{$proto}{$cipher}{'real_proto'} = $1;
-      $results{$proto}{$cipher}{'real_cipher'} = $2;
+      if ($1 ne $proto or $2 ne $cipher) {
+        $results{$proto}{$cipher}{'real_proto'} = $1;
+        $results{$proto}{$cipher}{'real_cipher'} = $2;
+        $results{$1}{$2}{'enabled'} = 'TRUE';
+        $results{$1}{$2}{'err'} = "^Changed from $proto:$2";
+      }
     } elsif (
 	      defined($proto) and defined($cipher) and
       	defined($results{$proto}{$cipher}{'enabled'}) and
@@ -683,33 +720,79 @@ sub check_sslv3 {
   my $server_ip_address = "$a.$b.$c.$d";
   my $sslv3;
   my $data;
-  $ciphers{'unknown'} = 'unknown';
+  $ciphers{'DEFAULT'} = 'DEFAULT';
   socket(SOCK,PF_INET,SOCK_STREAM,(getprotobyname('tcp'))[2])
      or die "Can't create a socket $!\n";
   connect( SOCK, pack_sockaddr_in($port, inet_aton($server_ip_address)))
      or die "Can't connect to port $port! \n";
-  print META "Connected. Port $port open on $host($server_ip_address)\n" if ($DEBUG);
+  print META "SSLv3 check - Connected. Port $port open on $host($server_ip_address)\n" if ($DEBUG);
   send(SOCK, pack("H*", "160300007f0100007b030058519b8d96f54eaabf8919a46dc84abf9f27da764863acfb2f8929ba6b5e412100005400040005000a000d001000130016002f0030003100320033003500360037003800390041004400450066008400870088009600ffc002c003c004c005c007c008c009c00ac00cc00dc00ec00fc011c012c013c0140100"), 0);
-  recv(SOCK,$data,4010,0); # or die "Error: $! $$";
-  if (substr($data, 0, 3) eq pack("H*", "160300")
-      and substr($data, 5, 1) eq pack("H*", "02")
-      and substr($data, 9, 2) eq pack("H*", "0300")) {
-    print META "SSLv3.0 enabled on $host\n" if ($DEBUG);
-    $sslv3 = "TRUE";
-  } else {
-    if ($DEBUG) {
-      print META "SSL check returned unknown response for protocol version: ";
-      print META unpack("H*", substr($data, 9, 2));
-    } elsif ($opt_v) {
-      print "Not running SSLv3\n";
+  recv(SOCK,$data,4010,0); # or return("FALSE");
+  if (defined($data) and length($data) > 1) {
+    if (substr($data, 0, 3) eq pack("H*", "160300")
+        and substr($data, 5, 1) eq pack("H*", "02")
+        and substr($data, 9, 2) eq pack("H*", "0300")) {
+      print META "SSLv3 enabled on $host\n" if ($DEBUG);
+      $sslv3 = "TRUE";
+    } elsif (substr($data, 0, 3) eq pack("H*", "150300")
+        and substr($data, 5, 2) eq pack("H*", "0228")) {
+      print META "\nSSLv3 not enabled on $host\n" if ($DEBUG);
+      $sslv3 = "FALSE";
+    } else {
+      if ($DEBUG) {
+        print META "SSLv3 check returned unknown response for protocol version: ";
+        print META unpack("H*", $data);
+        print "Not running SSLv3\n";
+      } elsif ($opt_v) {
+        print "Not running SSLv3\n";
+      }
+      print META "\nSSLv3 not enabled on $host\n" if ($DEBUG);
+      $sslv3 = "FALSE";
     }
-    print META "SSLv3 not enabled on $host\n" if ($DEBUG);
-    $sslv3 = "FALSE";
   }
   # print unpack("H*", $data);
   close (SOCK);
   return($sslv3);
 }
+
+sub check_sslv2 {
+  my ($host, $port) = @_;
+  my ($name,$aliases,$type,$len,@thisaddr) = gethostbyname($host);
+  my ($a,$b,$c,$d) = unpack('C4',$thisaddr[0]);
+  my $server_ip_address = "$a.$b.$c.$d";
+  my $sslv2;
+  my $data;
+  $ciphers{'DEFAULT'} = 'DEFAULT';
+  socket(SOCK,PF_INET,SOCK_STREAM,(getprotobyname('tcp'))[2])
+     or die "Can't create a socket $!\n";
+  connect( SOCK, pack_sockaddr_in($port, inet_aton($server_ip_address)))
+     or die "Can't connect to port $port! \n";
+  print META "SSLv2 check - Connected. Port $port open on $host($server_ip_address)\n" if ($DEBUG);
+  send(SOCK, pack("H*", "80310100020018000000100700c00500800300800100800800800600400400800200807664752da798fec91292c12f348420c5"), 0);
+  recv(SOCK,$data,4010,0); # or return();
+  if (defined($data) and length($data) > 0) {
+    if (substr($data, 2, 1) eq pack("H*", "04")
+        and substr($data, 5, 2) eq pack("H*", "0002")) {
+      print META "SSLv2 enabled on $host\n" if ($DEBUG);
+      $sslv2 = "TRUE";
+    } else {
+      if ($DEBUG) {
+        print META "SSLv2 check returned unknown response for protocol version: ";
+        print META unpack("H*", substr($data, 9, 2));
+        print "Not running SSLv2\n";
+      } elsif ($opt_v) {
+        print "Not running SSLv2\n";
+      }
+      print META "SSLv2 not enabled on $host\n" if ($DEBUG);
+      $sslv2 = "FALSE";
+    }
+  }
+  # print unpack("H*", $data);
+  close (SOCK);
+  return($sslv2);
+}
+
+
 
 sub check_ssl {
   my ($host, $port) = @_;
