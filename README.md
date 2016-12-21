@@ -9,6 +9,12 @@ I wanted a simple way to verify all the SSL ciphers a website could use
 (thanks PCI). I just needed something simple, not running a full blown 
 vuln scanner and all the tools I could find (thanks THC) were windows 
 based. So I wrote a very simple script… ssl-cipher-check.
+
+<br><br>
+<b>***UPDATE 2016-12-21 v2.1***</b> Fixed an error when scanning non-ssl port<br/>
+added checking for SSL before scanning<br/>
+ cleaned up some debug output.
+<br/>
 <br><br>
 <b>***UPDATE 2016-12-15 v2.0***</b> Major update.  Moved to GitHub. Rewrote a lot of logic to speed up and fix errors.
 <br/>
